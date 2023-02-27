@@ -1,0 +1,16 @@
+#people {
+    margin: 1em auto;
+}
+#people caption {
+    padding: 5px;
+}
+#people th {
+    color: #000;
+    background-color: #ccc;
+    font-weight: normal;
+}
+#people td, #people th {
+    border: 1px solid #ccc;
+    margin: 0;
+    padding: 4px;
+}
