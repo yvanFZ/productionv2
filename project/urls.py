@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import UpdateProject,GetAllProjects,GetProjectById,GetProjectItems,CreateProjectView,CreateKlantMedewerkerView,CreateKlant,AllProjectsList
+from .views import UpdateProject,GetAllProjects,GetProjectById,GetProjectItems,CreateProjectView,CreateKlantMedewerkerView,CreateKlant,AllProjectsList,CreateOnderaanemer,ListOnderaanemer
 
 app_name = 'project'
 
@@ -12,8 +12,9 @@ urlpatterns = [
     path('getProjectID',GetProjectById.as_view()),
     path('get-all-projects',GetAllProjects.as_view()),
     path('update-project',UpdateProject.as_view()),
-    path("getallproject",AllProjectsList.as_view())
-    
+    path("getallproject",AllProjectsList.as_view()),
+    path("post-bedrijfsaanemer",CreateOnderaanemer.as_view()),
+    path("get-bedrijfsaanemer",ListOnderaanemer.as_view())
     # re_path('list/',login_required(LeadListView.as_view()),name="list-leads"),
     # re_path('',login_required(CreateVertegenwoordigersLead.as_view()),name="create-vertegenwoordiger")
     ]

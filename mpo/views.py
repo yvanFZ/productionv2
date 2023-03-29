@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.core import serializers
 from project.models import Project
 from .models import Site,ProductieExact,Omvormer,IcemDebiet,Semkast,Warmtepomp, WTW,Boiler,Planning,Icem,Bouwkundig,Bewoners,ProductiebonStatus
+from django.db.models import Case, When
 import json
 import re
 
@@ -66,39 +67,39 @@ class GetMPO(APIView):
             'bewoner': bewoner
 
         }
+        
          # Site gegevens
-        for site in Site.objects.filter(projectId_id=(projectID)):
-            # Icem gegevens
-            icemdata = Icem.objects.filter(id = site.icemId_id).get()
-            # Boiler gegevens
-            idboiler = icemdata.boiler_Id_id
-            boilerdata = Boiler.objects.filter(id=idboiler).get()
-             # WP gegevens
-            idWP = icemdata.warmtepompId_id
-            wPdata = Warmtepomp.objects.filter(id=idWP).get()
-             # Omvormer gegevens
-            idOmvormer = icemdata.omvormerId_id
-            omvormerdata = Omvormer.objects.filter(id=idOmvormer).get()
-             # Icemdebiet gegevens
-            idIcemdebiet = icemdata.icemDebietId_id
-            icemdebietdata = IcemDebiet.objects.filter(id=idIcemdebiet).get()
-            #Semkast gegevens
-            idSemkast = icemdata.semkastId_id
-            semkastdata = Semkast.objects.filter(id=idSemkast).get()
-             # WTW gegevens
-            idWtw = icemdata.wtw_Id_id
-            wtwdata = WTW.objects.filter(id=idWtw).get()
-             # Planning gegevens
-            idPlanning = icemdata.planningId_id
-            planningdata = Planning.objects.filter(id=idPlanning).get()
-            #Bouwkundig gegevens
-            bouwkundigdata = Bouwkundig.objects.filter(id = site.bouwkundigId_id).get()
-             #Productie Exact
-            productieexactId = icemdata.productieExactId_id
-            productiedata = ProductieExact.objects.filter(id=productieexactId).get()
-             # Bewoner gegevens
-            bewonerdata = Bewoners.objects.filter(siteId_id=site.id).get()
+        project = getProject(projectID)
 
+        sites = Site.objects.filter(projectId_id = project).all()
+        siteIds = list(sites.values_list('id',flat=True))
+        icems = Icem.objects.in_bulk(list(siteIds))
+        preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(icems)])
+        # zorgt ervoor dat icemIds in zelfde volgorde worden teruggegeven als de sites, dus icem[0] hoort bij site[0] etc
+        icemIds = Icem.objects.filter(pk__in=icems).order_by(preserved)
+        icemsDebieten = IcemDebiet.objects.in_bulk(list(icemIds))
+        boilers = Boiler.objects.in_bulk(list(icemIds))
+        warmtepompen = Warmtepomp.objects.in_bulk(list(icemIds))
+        bouwkundigen = Bouwkundig.objects.in_bulk(list(siteIds))
+        omvormers = Omvormer.objects.in_bulk(list(icemIds))
+        bewoners = [Bewoners.objects.filter(site=site).get() for site in sites]
+        productie = ProductieExact.objects.in_bulk(list(icemIds))
+        semkasten = Semkast.objects.in_bulk(list(icemIds))
+        wtws= WTW.objects.in_bulk(list(icemIds))
+        planningen= Planning.objects.in_bulk(list(icemIds))
+
+        icems = [v for k, v in icems.items()]
+        icemsDebieten = [v for k, v in icemsDebieten.items()] 
+        boilers = [v for k, v in boilers.items()] 
+        warmtepompen = [v for k, v in warmtepompen.items()] 
+        omvormers = [v for k, v in omvormers.items()] 
+        bouwkundigen = [v for k, v in bouwkundigen.items()] 
+        productie = [v for k, v in productie.items()] 
+        semkasten = [v for k, v in semkasten.items()] 
+        wtws = [v for k, v in wtws.items()] 
+        planningen = [v for k, v in planningen.items()]
+        for site, icemdata, icemdebietdata, boilerdata, wPdata, omvormerdata, bouwkundigdata, bewonerdata, productiedata, semkastdata, wtwdata, planningdata in \
+             zip(sites, icems, icemsDebieten, boilers, warmtepompen, omvormers, bouwkundigen, bewoners, productie, semkasten, wtws, planningen):
             algemeneObject.append({
                 'blok': site.blok,
                 'straat': site.straat,
@@ -107,7 +108,6 @@ class GetMPO(APIView):
                 'bijzonderheden': site.bijzonderheden,
                 'koop_huur':site.koop_huur
             })
-            
             icemComponenten.append(
                 {
                 'blok': site.blok,
@@ -129,8 +129,9 @@ class GetMPO(APIView):
                 'positieWpModule': icemdata.positieWPmodule,
 
             })
-            
+
             icemDebiet.append({
+                'blok': site.blok,
                 'stand1': icemdebietdata.stand1,
                 'stand2': icemdebietdata.stand2,
                 'stand3': icemdebietdata.stand3,
@@ -138,35 +139,37 @@ class GetMPO(APIView):
                 'stand5': icemdebietdata.stand5,
 
             })
-            
             omvormer.append({
+                'blok': site.blok,
                 'omvormerOwner': omvormerdata.owner,
                 'omvromerMerk': omvormerdata.merkOmvormer,
                 'capaciteit': omvormerdata.capaciteit,
                 'levering_door': omvormerdata.levering_door,
                 'levering_datum': omvormerdata.levering_datum
             })
-           
+     
             planning.append({
+                'blok': site.blok,
                 'bouwrouting': planningdata.bouwrouting,
                 'leverdatum': planningdata.leverdatum
             })
-            
-            
+
             bouwkundig.append({
+                'blok': site.blok,
                 'nokHoogte': bouwkundigdata.nokHoogte,
                 'nokDiepte': bouwkundigdata.nokDiepte,
                 'typeDak': bouwkundigdata.typeDak,
                 'positiebuitendeel': bouwkundigdata.positieBuitendeel
             })
-            
+           
             productieExact.append({
+                'blok': site.blok,
                 'bomId': productiedata.bomId,
                 'exactnummer': productiedata.exactnummer
             })
-            
             bewoner.append(
                 {
+                'blok': site.blok,
                 'aanhef': bewonerdata.aanhef_bewoner,
                 'achternaam': bewonerdata.achternaam_bewoner,
                 'voorletter': bewonerdata.voorletters_bewoner,
@@ -174,11 +177,11 @@ class GetMPO(APIView):
                 'tussenvoegsel': bewonerdata.tussenvoegsels_bewoner,
                 'email': bewonerdata.email_bewoner
                 
-            }
+            }   
             )
-            
-    
+        print(bouwkundig)
         return jsonData
+
     # FUNCTIE BEWONERS AANMAKEN
     def bewonerAanmaken(self,data):
         try:
@@ -289,12 +292,15 @@ class GetMPO(APIView):
         if project != None:
 
             projectnaam =project.projectnaam
+            mpo_leng = int(re.findall(r'\d+', projectnaam)[0])
+            
         else:
             error = "Create project first"
             return Response({'error':error})
         # re.findall(r'\d+', projectnaam)
-        mpo_leng = int(re.findall(r'\d+', projectnaam)[0])
+        
         for  i in range(mpo_leng):
+           
              # create mpo tables
                 bouwkundigdata = {
                     'nokHoogte': None,
@@ -349,6 +355,7 @@ class GetMPO(APIView):
                 }
                 try:
                     bouwkundigId = self.bouwkundigAanmaken(bouwkundigdata)
+                   
                     planningId = self.planningAanmaken(planningdata)
                     boiler_Id = self.boilerAanmaken(boilerdata)
                     wtw_Id = self.wtwAanmaken(wtwdata)
@@ -404,25 +411,230 @@ class GetMPO(APIView):
                 
                 except Exception as e:
                     return Response({'error': str(e)})
-       
+
+    def create_sites(self, project, mpo_len):
+        all_sites = []
+        for i in range(mpo_len):
+            sitedata = {
+            'bouwnr': 1 + i,
+            'blok': None,
+            'straat': None,
+            'huisnr': None,
+            'postcode': None,
+            'bijzonderheden': None,
+            'koop_huur': None,
+            'projectId':project,
+            }
+            all_sites.append(Site(**sitedata))
+        Site.objects.bulk_create(all_sites)
+
     def post(self,request,format=None):
         projectID = self.request.data
-        
         try:
-        
             if Site.objects.filter(projectId_id = projectID).exists():
                 data = self.getAllmpoData(projectID)
-                return Response({'data': data})
+                # print("data found")
+              
+                return Response({'data': data},status=200)
             else: 
-                if self.createMPO(projectID):
+                try:
+                    # print('no data found')
+                    self.create_mpo(projectID)
                     data = self.getAllmpoData(projectID)
-                    return Response({'data': data})
-                else:
-                    print("error")
-            
+                
+                    return Response({'data': data},status=201)
+                except Exception as e:
+                    print(str(e))
+                    return Response({"error": str(e)}, status=401)
+         
         except Exception as e:
             print(e)
     # CREATE
+    def create_icems(self, sites):
+        all_icems = []
+        for site in sites:
+            icemdata = {
+                'site': site,
+                'icemType' : None,
+                'energieModule' : None,
+                'positieIcem' : None,
+                'aansluitingkanalen' : None,
+                'kwh_meter' : None,
+                'koeling' : None,
+                'positieWPmodule' : None,
+                'sensoringOptie' : None,
+                'type_prestatie' : None,
+            }
+            all_icems.append(Icem(**icemdata))
+        Icem.objects.bulk_create(all_icems)
+
+    # @csrf_exempt
+    def delete(self, request):
+        project_id = 5
+        project = getProject(project_id)
+        site_set = project.site_set.all()
+        number_of_sites = len(site_set)
+        site_set.delete()
+
+        return Response(f"{number_of_sites} sites deleted succesfull")
+
+    # @csrf_exempt
+    def get(self, request, **kwargs): 
+        projectID = 5
+        project = getProject(projectID)
+        if len(project.site_set.all()) == 0:
+            self.create_mpo(projectID)
+            status=201
+        else:
+            status=200
+        
+        data = self.getAllmpoData(projectID)
+        return Response(data, status=status)
+
+    def create_mpo(self, projectID):
+        project = getProject(projectID)
+        projectnaam = project.projectnaam
+        # re.findall(r'\d+', projectnaam)
+        mpo_leng = int(re.findall(r'\d+', projectnaam)[0])
+
+        allBewoners = []
+        allBouwkundig = []
+        allPlanning = []
+        allBoilers = []
+        allWtw = []
+        allWarmtepompen = []
+        allSemkasten = []
+        allIcemdebieten = []
+        allProductieBon = []
+        allProductieExact = []
+        omvormers = []
+        print(project.id)
+        self.create_sites(project, mpo_leng)
+        sites = Site.objects.filter(projectId = project).all()
+        self.create_icems(sites)
+        icems = [Icem.objects.select_related().filter(site = site).get() for site in sites]
+        for i, (site, icem) in enumerate(zip(sites, icems)):
+            bewonersdata = {
+                'aanhef_bewoner':None,
+                'achternaam_bewoner':None,
+                'voorletters_bewoner' : None,
+                'phone_bewoner':None,
+                'tussenvoegsels_bewoner':None,
+                'email_bewoner':None,
+                'site': site,
+            }
+            bewoner = Bewoners(**bewonersdata)
+            bewoner = self.bewonerAanmaken(bewonersdata)
+            allBewoners.append(bewoner)
+       
+            bouwkundigdata = {
+                    'site' : site,
+                    'nokHoogte': None,
+                    'nokDiepte': None,
+                    'typeDak': None,
+                    'positieBuitendeel': None
+                }
+            bouwkundig = Bouwkundig(**bouwkundigdata)
+            allBouwkundig.append(bouwkundig)
+            #bouwkundig = self.bouwkundigAanmaken(bouwkundigdata)  
+            
+            # Planning Aanmaken
+            planningdata = {
+                'icem': icem,
+                'bouwrouting':i+1,
+                'leverdatum':None,
+            }
+            planning = Planning(**planningdata)
+            #planning = self.planningAanmaken(planningdata)
+            allPlanning.append(planning)
+            # Boiler Aanmaken
+            boilerdata = {
+                'icem': icem,
+                'inhoud': None
+                } 
+            #boiler = self.boilerAanmaken(boilerdata)
+            boiler = Boiler(**boilerdata)
+            allBoilers.append(boiler)
+            #   Wtw Aanmaken
+            wtwdata = {
+                'icem': icem,
+                'merk': None,
+                'type': None,
+                'debiet': None
+            }
+            #wtw = self.wtwAanmaken(wtwdata)
+            wtw = WTW(**wtwdata)
+            allWtw.append(wtw)
+            # Warmte pomp Aanmaken
+            warmtepompdata = {
+                'icem': icem,
+                'vermogen': None
+                }
+            #warmtepomp = self.warmtepompAanmaken(warmtepompdata)
+            warmtepomp = Warmtepomp(**warmtepompdata)
+            allWarmtepompen.append(warmtepomp)
+            # Semkast Aanmaken
+            semkastdata = {
+                'icem': icem,
+                'type': None
+            }
+            
+            #semkast = self.semkastAanmaken(semkastdata)
+            semkast = Semkast(**semkastdata)
+            allSemkasten.append(semkast)
+            # Icem debiet Aanmaken
+            icemdebietdata = {
+                'icem': icem,
+                'stand1': None,
+                'stand2': None,
+                'stand3': None,
+                'stand4': None,
+                'stand5': None
+            }
+            #icemdebiet = self.icemdebietAanmaken(icemdebietdata)
+            icemdebiet = IcemDebiet(**icemdebietdata)
+            allIcemdebieten.append(icemdebiet)
+            # Productie aanmaken
+            productiedata = {
+                'icem': icem,
+                'bomId': None,
+                'exactnummer':None,
+            }
+            #productieExact = self.productieAanmaken(productiedata)
+            productieExact = ProductieExact(**productiedata)
+            allProductieExact.append(productieExact)
+            # Omvomermer aanmaken
+            omvormerdata = {
+                'icem': icem,
+                'merkOmvormer': None,
+                'dakheling': None,
+                'owner': None,
+                'capaciteit': None,
+                'levering_datum': None,
+                'levering_door': None,
+            }
+
+            productiebondata = {
+                "icem": icem,
+                "productiegereed": None,
+                "productieDatum": None,
+            }
+            productieBon = ProductiebonStatus(**productiebondata)
+            allProductieBon.append(productieBon)
+
+            omvormer = Omvormer(**omvormerdata)
+            omvormers.append(omvormer)
+        Bewoners.objects.bulk_create(allBewoners, ignore_conflicts=True)
+        Bouwkundig.objects.bulk_create(allBouwkundig)
+        Planning.objects.bulk_create(allPlanning)
+        Boiler.objects.bulk_create(allBoilers)
+        WTW.objects.bulk_create(allWtw)
+        Warmtepomp.objects.bulk_create(allWarmtepompen)
+        Semkast.objects.bulk_create(allSemkasten)
+        IcemDebiet.objects.bulk_create(allIcemdebieten)
+        ProductieExact.objects.bulk_create(allProductieExact)
+        ProductiebonStatus.objects.bulk_create(allProductieBon)
+        Omvormer.objects.bulk_create(omvormers)
 
 class CreateMPO(APIView):
 

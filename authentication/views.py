@@ -26,6 +26,7 @@ class HomeView(APIView):
 class CheckAuthenticatedView(APIView):
     def get(self,request, format=None):
         user = self.request.user
+    
         try:
             isAuthenticated = user.is_authenticated
 
@@ -69,8 +70,6 @@ class RegisterUserView(APIView):
 
         except Exception as e:
                 return Response({'error': str(e)})
-
-
 
 def authenticate_user(email, password):
     try:
@@ -118,12 +117,43 @@ class LogoutView(APIView):
             user = self.request.user
             user.is_loggedin = False
             user.save()
+            
             auth.logout(request)
 
             return Response({'success': 'Loggout successfully','email':user.email})
         except:
             return Response({'error': 'something went wrong when logging out'})
 
+class LockscreenView(APIView):
+    def post(self,request,format=None):
+        try:
+            
+            user = self.request.user
+            CustomUser.objects.filter(id=user.id).update(is_loggedin=False)
+            return Response({'success': 'Screen is locked'})
+        except:
+            return Response({'error': 'something went wrong when logging out'})
+        
+class UnlockscreenView(APIView):
+    def post(self,request,format=None):
+        
+        try:
+            
+            data = self.request.data
+            email = data['email']
+            password = data['password']
+            authUser = authenticate_user(email,password)
+            if authUser is not None:
+                
+                user_ = CustomUser.objects.filter(id=authUser.id).update(is_loggedin=True)
+                print(user_)
+                user_.save()
+                return Response({'success': 'Screen is unlocked'})
+            else:
+                return Response({'error': 'Wachtwoord niet correct'})
+        except:
+            return Response({'error': 'something went wrong when logging out'})
+        
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class GetCRSFToken(APIView):
     permission_classes = (permissions.AllowAny,)

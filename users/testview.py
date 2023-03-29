@@ -19,9 +19,6 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.views.generic import ListView
 
 
-
-
-
 # @login_required
 @login_required
 def seacrhUser_RoleForm(request):

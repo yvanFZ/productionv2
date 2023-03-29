@@ -20,7 +20,7 @@ class Role(models.Model):
 class Functie(models.Model):
 
     functie = models.CharField(max_length=30,help_text='Enter Functie')
-    rol = models.ForeignKey(Role, on_delete=models.CASCADE)
+    rol = models.ForeignKey(Role, null=False, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.functie}"
@@ -31,10 +31,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     is_loggedin = models.BooleanField(default=False)
-    last_login = models.DateTimeField(default=timezone.now)
+    last_login = models.DateTimeField(default="1900-01-01T13:20:30+03:00")
     is_staff = models.BooleanField(default=False)
+    functie = models.ForeignKey(Functie,null=False, on_delete=models.CASCADE)
+    
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['is_staff']
+    REQUIRED_FIELDS = ['is_staff','functie']
 
     objects = CustomUserManager()
 
@@ -55,9 +57,7 @@ class MedewerkerProfile(models.Model):
     achternaam = models.CharField(_('achternaam'),max_length=30,null=False)
     geslacht = models.CharField(max_length=30,null=False)
     geboortdatum= models.CharField(max_length=30,null=False)
-    rol = models.ForeignKey(Role,null=True, default=False, blank=True,on_delete=models.CASCADE,related_name="role_count")
-    functie = models.ForeignKey(Functie,null=True, default=False, blank=True,on_delete=models.CASCADE)
-    phone_no = PhoneNumberField()
+    phone_no = models.CharField(max_length=255,null=False)
     fax_number = PhoneNumberField(blank=True)
      
     def __str__(self):
@@ -65,21 +65,6 @@ class MedewerkerProfile(models.Model):
     class Meta:
         ordering = ('voornaam','achternaam','voorletter')
 
-# klant particulier model
-# class KlantProfile(models.Model):
-#     email =  models.EmailField(_('email address'),default=None, unique=True)
-#     voornaam = models.CharField(_('voornaam'),max_length=30,null=False)
-#     voorletter = models.CharField(max_length=1,null=True)
-#     tussenvoegsel = models.CharField(max_length=4,null=True)
-#     achternaam = models.CharField(_('achternaam'),default=None,max_length=30,null=False)
-#     geslacht = models.CharField(max_length=30,null=False)
-#     geboortdatum= models.DateField(auto_now_add=True)
-#     phone_no = PhoneNumberField()
-#     fax_number = PhoneNumberField(blank=True)
-#     is_particulier = models.BooleanField(default=False,null=False)
-
-#     def __str__(self):
-#         return f"{self.voornaam}"
 
 # klant woningbouw
 class klantWoningbouw(models.Model):

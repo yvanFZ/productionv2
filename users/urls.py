@@ -1,5 +1,5 @@
 from django.urls import path, re_path
-from .views import GetFunctieView,RoleListView,PostMedewerkersView,GetAllMedewerkersView,PasswordAanpassen,RoleView,CreateFunctieView , GetAllUsersView, GetUserProfileView, UpdateUserProfileView
+from .views import GetFunctieView,RoleListView,PostMedewerkersView,GetAllMedewerkersView,PasswordAanpassen,RoleView,CreateFunctieView , GetAllUsersView, GetUserProfileView, UpdateUserProfileView,UpdateMedewerkersView
 from . import testview 
 
 urlpatterns = [
@@ -15,9 +15,9 @@ urlpatterns = [
     path('user-update',UpdateUserProfileView.as_view()),
     path('get-allmedewerkers',GetAllMedewerkersView.as_view()), # this route will change in the future
     path('all-medewerkerAanmaken',PostMedewerkersView.as_view()), # this route will change in the future
+    path('medewerkers_update',UpdateMedewerkersView.as_view()), 
 
-
-    # test urls
+    # test urls 
     re_path('<int:id>',testview.index, name='index'),
     path('',testview.login_user,name="login"),
     re_path(r'^logout/$',testview.logout_user,name='logout'),

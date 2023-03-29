@@ -22,217 +22,139 @@ class UpdateMedewerkersView(APIView):
     def post(self, request, format=None):
         if(self.request.data):
             data = self.request.data
+            userObject = {
+                'is_active': data['status'],
+                'functie_id': data['functie'],
+                'email': data['email'],
+            }
+           
+            medewerkerObject = {
+                'voornaam': data['voornaam'],
+                'tussenvoegsel': data['tussenvoegsel'],
+                'achternaam': data['achternaam'],
+                'geslacht': data['geslacht'],
+                'phone_no': data['phone_no'],
+            }
+            
+            try:
+                          
+                if CustomUser.objects.filter(email=userObject['email']).update(**userObject):
+                    user = CustomUser.objects.filter(email=userObject['email']).values('id')[0]
+                    print(user['id'])
+                    medewerker = MedewerkerProfile.objects.filter(user_id=user['id']).update(**medewerkerObject)
+                    if medewerker:
+                        return Response({'success': 'medewerker is met success bijgewerkt'})
+                    else:
+                        return Response({'error': 'medewerker profile bewerken is niet gelukt'})
+                else:
+                    return Response({'error': 'user profile bewerken is niet gelukt'})
+                
+            except Exception as e:
+                print(e)
+                return Response({'error': str(e)})
+            
+            
           
 
 # MEDEWERKERS AANMAKEN
 @method_decorator(csrf_protect, name='dispatch')
 class PostMedewerkersView(APIView):
     permission_classes = (permissions.AllowAny,)
+    def createMedewerkerFuncion(self,data):
+        medewerker = MedewerkerProfile.objects.create(**data)
+        medewerker.save()
+        return medewerker
     def post(self, request, format=None):
         if(self.request.data):
+            
             data = self.request.data
-            email = data['email']
-            voornaam = data['voornaam']
-            voorletter = data['voorletter']
-            tussenvoegsel = data['tussenvoegsel']
-            achternaam = data['achternaam']
-            geslacht = data['aanhef']
-            functie = data['functie']
-            role = data['role']
-            phone = data['phone']
-            geboortdatum = data['geboortDatum']
-            is_actif = data['status']
-            password = data['password']
+            # print(type(data))
             re_password = data['re_password']
+            userObject ={
+                'email':data['email'],
+                'is_active' : data['is_active'],
+                'functie_id' : data['functie'],
+                'password' : data['password'],
+                'is_staff': 1,
+                'is_loggedin': 0,
+            }
             try:
-                if CustomUser.objects.filter(email=email).exists():
-                    # Update
-
-                    return Response({'success': True})
+                if CustomUser.objects.filter(email=userObject['email']).exists(): 
+                    return Response({'success': 'Medewerker bestaat al'})
                 else:
-                    
-                    if password == re_password:
-                        if len(password) < 8:
-                            
-                            return Response({'error': False})
-                        else:
-                            is_actif_ = 0
-                            if is_actif == "Actif":
-                                is_actif_ = 1
-                        
-                            user = CustomUser.objects.create(email = email,password = make_password(password),is_active=is_actif_,is_staff = 1)
-                            user.save()
-                            medewerker = MedewerkerProfile.objects.create(
-                                voornaam = voornaam,
-                                voorletter = voorletter,
-                                tussenvoegsel = tussenvoegsel,
-                                achternaam = achternaam,
-                                geslacht = geslacht,
-                                geboortdatum = geboortdatum,
-                                phone_no = phone,
-                                functie_id = functie,
-                                rol_id = role,
-                                user_id = user.id
-                            )
+                    if userObject['password'] == re_password:
+                       if len(userObject['password']) < 8:
+                            return Response({'error': 'wachtwoord moet minimaal 8 charachters '})
+                       else:
+                            userObject['password'] = make_password(userObject['password'])
                             try:
-                                medewerker.save()
+                                print(userObject)
+                                user = CustomUser.objects.create(**userObject)
+                                
+                            except Exception as e:
+                                print(e)
+                                return Response({'error': str(e)})
+                            user.save()
+                            objectMedewerker = {
+                                'voornaam': data['voornaam'],
+                                'voorletter': data['voorletter'],
+                                'geboortdatum': data['geboortDatum'],
+                                'tussenvoegsel': data['tussenvoegsel'],
+                                'achternaam': data['achternaam'],
+                                'geslacht': data['geslacht'],
+                                'phone_no': data['phone_no'],
+                                'user_id': user.id
+                            }
+                            try:
+                           
+                                self.createMedewerkerFuncion(objectMedewerker)
                                 return Response({'success': True})
                             except Exception as e: 
+                                # print(e)
                                 return Response({'error':str(e)})
                     else:   
-                        return Response({'error': 'Password doesnt match'})  
-            
-            except Exception as e: 
+                        return Response({'error': 'Password doesnt match'})
+            except Exception as e:
+                # print(e)
                 return Response({'error':str(e)})
-            
-
-            
+       
 # GET ALL MEDEWERKER API
 class GetAllMedewerkersView(APIView):
+
+    def getFunctieMedewerker(self,id):
+        user = CustomUser.objects.filter(id=id).values('functie_id')
+        user_id = user[0]['functie_id']
+        functie = Functie.objects.filter(id=int(user_id)).values('functie','rol_id')
+        return functie
+    def getRoleName(self,id):
+        rol = Role.objects.filter(id=id).values('role_name')
+        return rol
+    def getuser_data(self,id):
+        user = CustomUser.objects.filter(id=id).values('email','is_active')
+        return user[0]
     def get(self, request, format=None):
-
-      
-        medewerkers = MedewerkerProfile.objects.all()
-
-        ids = []
-        aanhefs = []
-        voornaams = []
-        tussenvoegsels = []
-        achternaams = []
-        functies = []
-        roles = []
-        gebruikers = []
-        phones = []
-        emails = []
-        status = []
-
-        # Roles
-        roleResult = Role.objects.all()
-        role_Result = RoleSerializer(roleResult,many=True)
-
-        # Functies
-        functieResult = Functie.objects.all()
-        functie_Result = FunctieSerializer(functieResult,many=True)
-        # GET Functie Naam
-        def getFunctieNaam(functieID):
-            functies = Functie.objects.all()
-            functie_name = ''
-            for functie in functies.iterator():
-                if functie.id == functieID:
-                    functie_name = functie.functie
-            return functie_name
-        # GET STATUS
-        def getStatusUser(userId):
-
-            users = CustomUser.objects.all()
-            status = ''
-            for user in users.iterator():
-                if user.id == userId:
-                    is_active = user.is_active
-                    if is_active == 1 :
-                        status = 'Actif' 
-                    
-                    else:
-                        status = 'Inactif'
-                    
-            return status
-        # GET Email
-        def getEmailUser(userId):
-
-            users = CustomUser.objects.all()
-            email = ''
-            for user in users.iterator():
-                if user.id == userId:
-                    email = user.email
-                    
-            return email
+        # medewerkers = MedewerkerProfile.objects.all()
+        medewerkersArray = []
         
-        # GET Gebruiker
-        def getUsergebruiker(userId):
-
-            users = CustomUser.objects.all()
-            gebruiker = ''
-            for user in users.iterator():
-                if user.id == userId:
-                    is_superuser = user.is_superuser
-                    if is_superuser == 1:
-                        gebruiker = 'Super User'
-                    else:
-                        gebruiker = 'Normale gebruiker'
-                    
-            return gebruiker
-        
-        
-        # GET Role Naam
-        def getRoleNaam(roleID):
-            roles = Role.objects.all()
-            role_name = ''
-            for role in roles.iterator():
-                if role.id == roleID:
-                    role_name = role.role_name
-            return role_name
-
-        for medewerker in medewerkers.iterator():
-            id = medewerker.id
-            ids.append(id)
-            aanhef = medewerker.geslacht
-            aanhefs.append(aanhef)
-            voornaam = medewerker.voornaam
-            voornaams.append(voornaam)
-            tussenvoegsel = medewerker.tussenvoegsel
-            tussenvoegsels.append(tussenvoegsel)
-            achternaam = medewerker.achternaam
-            achternaams.append(achternaam)
-            functie = getFunctieNaam(medewerker.functie_id)
-            functies.append(functie)
-            role = getRoleNaam(medewerker.rol_id)
-            roles.append(role)
-            gebruiker = getUsergebruiker(medewerker.user_id)
-            gebruikers.append(gebruiker)
-            phone =  str(medewerker.phone_no)
-            phones.append(phone)
-            email = getEmailUser(medewerker.user_id)
-            emails.append(email)
-            is_active = getStatusUser(medewerker.user_id)
-            status.append(is_active)
-        
-        context = [
-            {
-                'id': i,
-                'aanhef': j,
-                'voornaam': k,
-                'tussenvoegsel': a,
-                'achternaam': b,
-                'functie': c,
-                'role': d,
-                'gebruiker': e,
-                'phone': f,
-                'email': g,
-                'status': h
-                } for i, j, k, a,b,c,d,e,f,g,h in zip(
-                    ids, 
-                    aanhefs,
-                    voornaams,
-                    tussenvoegsels,
-                    achternaams,
-                    functies,
-                    roles,
-                    gebruikers,
-                    phones,
-                    emails,
-                    status
-      
-                    )
-                ]
-
-        return Response({
-            'success': True,
-            'context': context,
-            'roles': role_Result.data,
-            'functies': functie_Result.data
-          
-            })
-
+        medewerkers = MedewerkerProfile.objects.values('id','voornaam','achternaam','geslacht','tussenvoegsel','user_id','phone_no')
+        for i in medewerkers:
+            functieDatas =  self.getFunctieMedewerker(i['user_id'])
+            userDatas = self.getuser_data(i['user_id'])
+            # print(functieDatas)
+            medewerkerobject = {
+            'geslacht': i['geslacht'],
+            'voornaam':i['voornaam'],
+            'tussenvoegsel': i['tussenvoegsel'],
+            'achternaam': i['achternaam'],
+            'phone_no': i['phone_no'],
+            'functie': functieDatas[0]['functie'],
+            'rol_name': self.getRoleName(int(functieDatas[0]['rol_id']))[0]['role_name'],
+            'email': userDatas['email'],
+            'status': userDatas['is_active']
+            }
+            
+            medewerkersArray.append(medewerkerobject)
+        return Response({'context': medewerkersArray,'success': True})
 
 # PASSWORD AANPASSEN
 class PasswordAanpassen(APIView):
@@ -254,9 +176,7 @@ class PasswordAanpassen(APIView):
                     })
             else:
                 return Response({'error':'Incorrect password'})
-                
-
-            
+                            
 class RoleListView(APIView):
 
     def returnCOuntMedewerkers(self,role_id):
@@ -268,26 +188,25 @@ class RoleListView(APIView):
         
         # return medewerkerResult
 
-
     def get(self,request,format=None):
-        roleResult = Role.objects.all()
-        data = []
-        for role in roleResult:
-            role_id = role.id
-            medewekerCount = self.returnCOuntMedewerkers(role_id)
-            if medewekerCount == None:
-                medewekerCount = 0
-            role_name = role.role_name
-            context = {
-                'id': role_id,
-                'role_name': role_name,
-                'medewekerCount': medewekerCount
-            }
-            data.append(context)
+        roleResult = Role.objects.values_list('id','role_name')
+        # data = []
+        # for role in roleResult:
+            # role_id = role.id
+            # medewekerCount = self.returnCOuntMedewerkers(role_id)
+            # if medewekerCount == None:
+            #     medewekerCount = 0
+            # role_name = role.role_name
+            # context = {
+            #     'id': role_id,
+            #     'role_name': role_name,
+            #     'medewekerCount': medewekerCount
+            # }
+            # data.append(context)
             
         # role_Result = RoleSerializer(roleResult,many=True)
         return Response({
-            'roles': data
+            'roles': roleResult,
         })
 
 class RoleView(APIView):
@@ -295,33 +214,24 @@ class RoleView(APIView):
     def post(self,request,format=None):
         # if self.request.is_ajax():
         data = self.request.data
-        role_name = data['role']
         try:
-            if Role.objects.filter(role_name = role_name).exists():
+            if Role.objects.filter(role_name = data['role_name']).exists():
                 return Response({
-                    'is_success': False,
-                    'message': role_name + ' already exist ',
+                    'success': False,
+                    'message': data['role_name'] + ' already exist ',
                     })
             else:
-                role = Role.objects.create(role_name = role_name)
+                role = Role.objects.create(**data)
                 role.save()
                 return Response({
-                    'is_success': True,
-                    'message': role_name + ' is successfuly created ',
+                    'success': True,
+                    'message': data['role_name'] + ' is successfuly created ',
                     })
         except Exception as e:
 
             return Response({
                 'is_success': False,
                 'message': str(e)})
-        # else:
-        #     if self.request.data:
-        #         data = self.request.data
-        #         role = Role.objects.create(role_name = role_name)
-        #         role.save()
-
-
-
     
 class GetFunctieView(APIView):
 
@@ -333,47 +243,51 @@ class GetFunctieView(APIView):
             return None
 
     def get(self,request,format=None):
-        functieResult = Functie.objects.all()
-        data = []
-        for functie in functieResult:
-            functie_id = functie.id
-            medewekerCount = self.returnCOuntMedewerkers(functie_id)
-            if medewekerCount == None:
-                medewekerCount = 0
-            functie_name = functie.functie
-            context = {
-                'id': functie_id,
-                'functie_name': functie_name,
-                'medewekerCount': medewekerCount
-            }
-            data.append(context)
+        functieResult = Functie.objects.values_list('id','functie','rol_id')
+        # data = []
+        # for functie in functieResult:
+        #     functie_id = functie.id
+        #     medewekerCount = self.returnCOuntMedewerkers(functie_id)
+        #     if medewekerCount == None:
+        #         medewekerCount = 0
+        #     functie_name = functie.functie
+        #     context = {
+        #         'id': functie_id,
+        #         'functie_name': functie_name,
+        #         'medewekerCount': medewekerCount
+        #     }
+        #     data.append(context)
 
         return Response({
-            'functies': data
+            'functies': functieResult
         })
 
 class CreateFunctieView(APIView):
 
     def post(self,request,format=None):
         data = self.request.data
-        functie_name = data['functie']
-        rol_id = data['role']
+        
         try:
-            if Role.objects.filter(id = rol_id).exists():
-                if Functie.objects.filter(functie = functie_name).exists():
+            
+            if Role.objects.filter(id = data['rol_id']).exists():
+                
+                if Functie.objects.filter(functie = data['functie']).exists():
                     return Response({'error':'the functie name exist already'})
                 else:
-                    role = rol_id
-                    functie_name = functie_name
-                    functie = Functie.objects.create(functie = functie_name,rol_id = role)
-                    functie.save()
+                    print(data['functie'])
+                    try:
+                        Functie.objects.create(**data)
+                        print('succed')
+                    except Exception as e:
+                        print(str(e))
+
+                    # functie = Functie.objects.create(**data)
+                    # functie.save()
                     return Response({'success':'Funcite is successfully created'})
             else:
                 return Response({'error': 'Create first role object'})
         except:
             return Response({'error': 'something went wrong with creating the role'})
-
-#Read
 
 class GetAllUsersView(APIView):
     # permission_classes = (permissions.AllowAny,)
@@ -390,40 +304,41 @@ class GetUserProfileView(APIView):
     def getFunctieName(self,args):
         functie = Functie.objects.filter(id=args).get()
         # functie = FunctieSerializer(functie)
-        return functie.functie
+        return functie
 
     def get(self, request, format=None):
         try:
             user = self.request.user
             email = user.email
-            user_profile = CustomUser.objects.get(id=user.id)
+            user_profile = CustomUser.objects.filter(id=user.id).get()
             gebruiker = 'Normale Gebruiker'
-            if user_profile.is_staff == False:
+            if user_profile.is_superuser == False:
                 gebruiker = 'Normale User'
             else:
                 gebruiker = 'Super User'
             # MEDEWERKER
             medewerker = MedewerkerProfile.objects.get(user_id=user.id)
             medewerker_ = MedewerkerSerializer(medewerker)
-            idRole = medewerker.rol_id
-            idFunctie = medewerker.functie_id
-            role = Role.objects.get(id=idRole)
-            role = RoleSerializer(role)
-            functie = self.getFunctieName(idFunctie)
+            # idRole = medewerker.rol_id
+            # idFunctie = medewerker.functie_id
+            # role = Role.objects.get(id=idRole)
+            # role = RoleSerializer(role)
             
-                
+            functie = self.getFunctieName(user.functie_id)
+            role = Role.objects.get(id=functie.rol_id)
+            
             return Response({
-                'medewerker': medewerker_.data, 
+                'medewerker': medewerker_.data,
+                'is_loggedin': user_profile.is_loggedin,
                 'email': str(email),
-                'role':role.data,
-                'functie': functie,
+                'role':role.role_name,
+                'functie': functie.functie,
                 'gebruiker': gebruiker
                 })
 
         except:
             return Response({'error': 'Something went wrong'})
         
-
 # update
 class UpdateUserProfileView(APIView):
     def put(self, request, format=None,*args,**kwargs):
@@ -438,6 +353,5 @@ class UpdateUserProfileView(APIView):
         user.save()
         return Response({'profile': user.data, 'email': str(email)})
         # return Response({'success': 'Password successfully aangepast'})
-
 
 # delete
