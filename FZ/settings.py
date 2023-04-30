@@ -21,8 +21,11 @@ from wsgiref import handlers
 # BASE_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-env = environ.Env()
+env = environ.Env(
+    #Set casting, default value
+    DEBUG=(bool, False) )
 environ.Env.read_env()
+
 
 
 # Quick-start development settings - unsuitable for production

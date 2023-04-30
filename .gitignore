@@ -4,9 +4,9 @@ db.sqlite3
 .vscode
 .requirements.txt
 .dest
-.env
-/env
+# .env
+# /env
 .production
 .readMe
 /settings_dev.py
-/settings.py
+# /settings.py
