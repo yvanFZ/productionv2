@@ -14,6 +14,8 @@ from pathlib import Path
 import os
 import environ
 from django.core.exceptions import ImproperlyConfigured
+from socketserver import BaseServer
+from wsgiref import handlers
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,13 +30,6 @@ environ.Env.read_env()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # Your secret key
-# def get_env_variable(var_name):
-#     try:
-#         return os.environ[var_name]
-#     except KeyError:
-#         error_msg = "set the %s environment variable" % var_name
-#         raise ImproperlyConfigured(error_msg)
-
 
 SECRET_KEY = env('SECRET_KEY')
 
@@ -70,24 +65,16 @@ INSTALLED_APPS = [
 CSRF_COOKIE_HTTPONLY = False
 # CSRF_COOKIE_SAMESITE = 'Strict'
 CSRF_COOKIE_SAMESITE=None
-# ALLOWED_HOSTS=['127.0.0.1']
 ALLOWED_HOSTS=['app-factoryzero.azurewebsites.net']
 CORS_ORIGIN_ALLOW_ALL = True
-CSRF_TRUSTED_ORIGINS = ['https://app-factoryzero.azurewebsites.net']
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = (
     'https://app-factoryzero.azurewebsites.net',
 )
 REST_FRAMEWORK = {
-    # Permissions possible in restframework
-    # AllowAny
-    # IsAuthenticated
-    # IsadminUser
-    # IsAuthtenticatedOrReadOnly
-
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-        # 'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
@@ -141,7 +128,6 @@ DATABASES = {
         'HOST': env('DB_HOST'), 
         'PORT': env('DB_PORT'),
         'sslmode': env('sslmode'),
-     
     }
 }
 
@@ -183,18 +169,16 @@ USE_TZ = False
 
 STATIC_URL = '/static/'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
-# STATICFILES_DIRS = os.path.join(BASE_DIR, 'build/static/')
+
 
 # # the path for developement
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'build/static/')] 
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# STATIC_ROOT = BASE_DIR / "staticfiles"
+
 
 # LOGIN_REDIRECT_URL = "authentification:home"
 # LOGOUT_REDIRECT_URL = "login" 
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.CustomUser'
 
