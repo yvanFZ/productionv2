@@ -131,6 +131,13 @@ DATABASES = {
         'HOST': env('DB_HOST'), 
         'PORT': env('DB_PORT'),
         'sslmode': env('sslmode'),
+################################################
+        # 'NAME': 'app-factoryzero-database', 
+        # 'USER': 'glakesxube',
+        # 'PASSWORD': 'CG81Q4G2ZX723KN8$',
+        # 'HOST': 'app-factoryzero-server.postgres.database.azure.com', 
+        # 'PORT': '5432',
+        # 'sslmode': 'require',
     }
 }
 

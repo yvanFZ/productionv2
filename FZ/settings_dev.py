@@ -19,9 +19,7 @@ from django.core.exceptions import ImproperlyConfigured
 # BASE_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-env = environ.Env(
-    #Set casting, default value
-    DEBUG=(bool, False) )
+env = environ.Env()
 environ.Env.read_env()
 
 
@@ -185,7 +183,7 @@ USE_TZ = False
 
 STATIC_URL = '/static/'
 # STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
-# STATICFILES_DIRS = os.path.join(BASE_DIR, 'build/static/')
+# STATICFILES_DIRS = os.path.join(BASE_DIR, 'build_dev/static/')
 
 # # the path for developement
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'build_dev/static/')] 
