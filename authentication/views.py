@@ -31,13 +31,24 @@ class CheckAuthenticatedView(APIView):
             isAuthenticated = user.is_authenticated
 
             if isAuthenticated:
+                # check his functie and check which permissions this functie has
                 return Response({ 'isAuthenticated': 'success' })
             else:
                 return Response({ 'isAuthenticated':'error'})
         except:
             return Response({'error':'Something when wrong during verify authentication'})
 
-
+class LoadUsersPermissions(APIView):
+    def get(self,request,format=None):
+        user = self.request.user
+        try:
+            userpermissions = user.user_permissions.values_list('codename',flat=True)
+            print(userpermissions)
+            return Response({'data':userpermissions})
+        except Exception as e:
+            print(str(e))
+            return Response({'error':str(e)})
+            
 # @method_decorator(csrf_protect, name='dispatch')
 class RegisterUserView(APIView):
     # permission_classes = (permissions.AllowAny,)

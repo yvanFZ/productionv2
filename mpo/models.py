@@ -17,6 +17,7 @@ class Site(models.Model):
 
     def __str__(self):
         return f"{self.bouwnr}"
+    
 class Icem(models.Model):
     site = models.OneToOneField(
         Site,
@@ -31,8 +32,11 @@ class Icem(models.Model):
     type_prestatie = models.CharField(max_length=30,null=True,default=True)
     koeling = models.CharField(max_length=30,null=True,default=True)
     positieWPmodule = models.CharField(max_length=30,null=True,default=True)
+    
     def __str__(self):
         return f"{self.icemType}"
+    class Meta:
+        ordering = ['site']
 
 class IcemDebiet(models.Model):
     stand1 = models.IntegerField(null=True,default=True)

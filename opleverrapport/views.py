@@ -8,11 +8,25 @@ from mpo.models import Site,Icem
 import datetime
 # Create your views here.
 
+def get_sites(project):
+    try:
+        sites = Site.objects.filter(projectId=project).order_by('id')
+        return sites
+    except Exception as e:
+        return str(e)
+def get_project_by_id(id):
+    try:
+        project = Project.objects.filter(id=id).get()
+        return project
+    except Exception as e:
+        return str(e)
+
 class GetOpleverrapportOverzicht(APIView):
+
      # GET ICEM GEGEVENS
     def getICemData(self,icemID):
         try:
-            icem = Icem.objects.filter(id=icemID).get()
+            icem = Icem.objects.filter(site_id=icemID).get()
             if icem.energieModule is None or icem.icemType is None or icem.positieIcem is None:
                 return "Geen"
             
@@ -68,18 +82,23 @@ class GetOpleverrapportOverzicht(APIView):
         
     def getMpo(self,idProject):
         context = []
-        for site in Site.objects.filter(projectId_id = idProject):
+        project = get_project_by_id(idProject)
+        sites = get_sites(project)
+        print(sites)
+        for site in sites:
+            print(site)
             context.append({
                 'blok': self.checkIfValueIsNone(site.blok),
                 'bouwnr': self.checkIfValueIsNone(site.bouwnr),
                 'straat': self.checkIfValueIsNone(site.straat) + ' ' + self.checkIfValueIsNone(site.huisnr),
                 'postcode': self.checkIfValueIsNone(site.postcode),
-                'icem': self.getICemData(site.icemId_id),
-                'opleverrapportaangemaakt': self.checkIftestRapportExist(site.id,idProject),
-                'datumrapportrapportAangemaakt': self.getDatumTestrapport(site.id,idProject),
-                'definitief': self.getDefinitiefTestrapport(site.id,idProject)
+                'icem': self.getICemData(site),
+                'opleverrapportaangemaakt': self.checkIftestRapportExist(site,idProject),
+                'datumrapportrapportAangemaakt': self.getDatumTestrapport(site,idProject),
+                'definitief': self.getDefinitiefTestrapport(site,idProject)
 
             })
+        print(context)
         
         
         return context
@@ -87,6 +106,7 @@ class GetOpleverrapportOverzicht(APIView):
       # POST METHOD
     def post(self,request,format=None):
         data = self.request.data
+        print(data)
         try: 
             context = self.getMpo(data['projectID'])
             return Response({'context': context})
@@ -166,13 +186,6 @@ class CreateOpleverRapport(APIView):
     def getprojectId(self,projectId):
         project = Project.objects.filter(id=projectId).get()
         return project.id
-    # def is_engineer(self):
-    #     user = MedewerkerProfile.objects.filter(user_id = self.user).get()
-    #     if user.functie_id == 13:
-    #         return True
-    #     else:
-    #         return False   
-    # @permission_required(is_engineer)
 
     def createOpleverRapport(self,projectId,siteId,data):
             if Opleverrapport.objects.filter(site_id = siteId,project_id = projectId).exists():
@@ -240,9 +253,9 @@ class CreateOpleverRapport(APIView):
         try: 
             response = self.createOpleverRapport(project,siteId,data)
             if response['success'] == 'aangemaakt':
-                return Response({'success': 'Testrapport met success aangemaakt'})
+                return Response({'success': 'Opleverrapport met success aangemaakt'})
             elif response['success'] == 'bewerkt':
-                return Response({'success': 'Testrapport met success bijgewerkt'})
+                return Response({'success': 'Opleverrapport met success bijgewerkt'})
             else:
                 return Response({'error': response['error']})
 

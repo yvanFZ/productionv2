@@ -10,6 +10,19 @@ from django.contrib.auth.decorators import permission_required
 import datetime
 # Create your views here.
 
+def get_project_object(id):
+    try:
+        project = Project.objects.filter(id=id).get()
+        return project
+    except Exception as e:
+        return str(e)
+def get_site_object(id):
+    try:
+        site = Site.objects.get(id = id)
+        return site
+    except Exception as e:
+        return str(e)
+
 class GetTestrapport(APIView):
     
     def getAuthorName(self,id):
@@ -18,10 +31,11 @@ class GetTestrapport(APIView):
         return name
     def post(self,request,format=None):
         data = self.request.data
-        if Testrapport.objects.filter(project_id = data['project_id'],site_id= data['site_id']).exists():
-
-            testrapport = Testrapport.objects.filter(project_id = data['project_id'],site_id= data['site_id']).get()
-            
+        site = get_site_object(data['site_id'])
+        project = get_project_object(data['project_id'])
+        if Testrapport.objects.filter(project = project,site=site).exists():
+            testrapport = Testrapport.objects.filter(project=project,site=site).get()
+            print(testrapport)
             context = {
                 'id': testrapport.id,
                 'last_edit_datum': testrapport.last_edit_datum,
@@ -164,12 +178,11 @@ class CreateTestrapport(APIView):
             return Response({'error': str(e)})
             
 class GetTestrapportOverzicht(APIView):
-  
-      
+
       # GET ICEM GEGEVENS
     def getICemData(self,icemID):
         try:
-            icem = Icem.objects.filter(id=icemID).get()
+            icem = Icem.objects.filter(site_id=icemID).get()
             if icem.energieModule is None or icem.icemType is None or icem.positieIcem is None:
                 return "Geen"
             
@@ -221,24 +234,24 @@ class GetTestrapportOverzicht(APIView):
             str_ = 'Geen'
         else:
             str_ = str
-        return str_
-        
+        return str_ 
+   
     def getMpo(self,idProject):
         context = []
-        for site in Site.objects.filter(projectId_id = idProject):
+        project = get_project_object(idProject)
+        sites = Site.objects.filter(projectId_id = project).order_by('id')
+        for site in sites:
             context.append({
                 'blok': self.checkIfValueIsNone(site.blok),
                 'bouwnr': self.checkIfValueIsNone(site.bouwnr),
                 'straat': self.checkIfValueIsNone(site.straat) + ' ' + self.checkIfValueIsNone(site.huisnr),
                 'postcode': self.checkIfValueIsNone(site.postcode),
-                'icem': self.getICemData(site.icemId_id),
+                'icem': self.getICemData(site),
                 'testrapportaangemaakt': self.checkIftestRapportExist(site.id,idProject),
                 'datumtestrapportAangemaakt': self.getDatumTestrapport(site.id,idProject),
                 'definitief': self.getDefinitiefTestrapport(site.id,idProject)
 
-            })
-        
-        
+            })  
         return context
         
       # POST METHOD
@@ -250,7 +263,5 @@ class GetTestrapportOverzicht(APIView):
         except Exception as e:
             return Response({'error':str(e)})
 
-
             
 
-    

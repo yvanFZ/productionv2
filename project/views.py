@@ -4,8 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
-import datetime
-from datetime import date
+from datetime import date,datetime
 from django.core import serializers
 from countryinfo import CountryInfo
 from .serializer import ProjectIcemSerializer,ProjectSerializer,KlantSerializer,KlantMedewerkerSerializer
@@ -15,15 +14,7 @@ from users.models import MedewerkerProfile,klantWoningbouw,Role,Functie,CustomUs
 from users.serializers import MedewerkerSerializer,klantWoningbouwSerializer
 import numpy as np
 # GET DATEFORMAT
-def getDateformat(dateString):
-     
-    if dateString !="" and dateString != 'NaN-NaN-NaN':
-        format_str = '%d-%m-%Y' # The format
-        formatstringDate = datetime.datetime.strptime(dateString, format_str)
-        # formatstringDate_ = formatstringDate.strftime('%d-%m-%Y')
-        return formatstringDate
-    else:
-        return None
+
 # GET LAND
 def getLandNaam(self,string):
 
@@ -51,7 +42,7 @@ def projectleiderFZArray(string):
             customers = CustomUser.objects.filter(functie_id = i[0]).values_list('id')
         else:
             pass
-    # print(customers)
+
     for i in customers:
         medewerker = MedewerkerProfile.objects.filter(user_id = i[0]).get()
         medewerkerObject = {
@@ -59,45 +50,83 @@ def projectleiderFZArray(string):
             'name': medewerker.voornaam + ' ' + medewerker.achternaam,
             'phone_no':str(medewerker.phone_no)
         }
-
-        # users_list = [entry for entry in medewerker]
-        # print(medewerker)
-        # medewerkerObject = {
-        #     'id': users_list['id'],
-        #     'voornaam': users_list['voornaam'],
-        #     'achternaam': users_list['achternaam'],
-        #     'phone_no': users_list['phone_no']
-        # }
         users.append(medewerkerObject)
-    # users_list = [entry for entry in users]
-    print(users)
     return users
+def returnProvinciesperLand(country):
+    country_= CountryInfo(country)
+    provincies = country_.provinces()
+    return provincies
 
 def getKlanten():
     klanten = Klant.objects.values_list('id','klantnaam')
-    # print(klanten)
+
     return klanten
 # UPDATE PROJECT
 class UpdateProject(APIView):
     def getMedewerkerId(self,id):
         project = Project.objects.filter(id=id).get()
         return project.klant_id
+    def get_onderaanemer(self,param):
+        onderaanemer = Onderaanemerbedrijf.objects.get(id=int(param))
+        return onderaanemer
+    def check_datas_to_be_sent(self,param1,param2,param3,param4):
+        data_to_be_sent = {
+                'status': param1,
+                'odernummer': param3,
+                'onderaanemer': self.get_onderaanemer(param2),
+                'project_id': param4
+            }
+
+        try:
+            if StatusOnderaanemer.objects.filter(project_id=data_to_be_sent['project_id'],onderaanemer=data_to_be_sent['onderaanemer'],status=data_to_be_sent['status']).exists():
+                StatusOnderaanemer.objects.filter(project_id=data_to_be_sent['project_id'],onderaanemer=data_to_be_sent['onderaanemer'],status=data_to_be_sent['status']).update(**data_to_be_sent)
+                return True
+            else:
+                StatusOnderaanemer.objects.create(**data_to_be_sent)
+                return True  
+        except Exception as e:
+            return str(e)
+        
+
+    def createOrupdateStatusOnderaanemer(self,project,data):
+        for key, value in data.items(): 
+           
+            if key == 'inopdrachtvoor_vloerverwarming':
+                if data['inopdrachtvoor_vloerverwarming'] != None:
+                    res = self.check_datas_to_be_sent('vloerverwarming',data['inopdrachtvoor_vloerverwarming'],data['ordernr_onderaannemer_vloerverwarming'],project)
+                    return res
+                else:
+                    return None
+                
+            elif key == 'inopdrachtvoor_ventilatieinstallatie':
+                if data['inopdrachtvoor_ventilatieinstallatie'] != None:
+                    res = self.check_datas_to_be_sent('ventilatieinstallatie',data['inopdrachtvoor_ventilatieinstallatie'],data['ordernr_onderaannemer_vloerverwarming'],project)
+                    return res
+                else:
+                    return None
+            elif key == 'inopdrachtvoor_zonnepanelen':
+                if data['inopdrachtvoor_zonnepanelen'] != None:
+                    res = self.check_datas_to_be_sent('zonnepanelen',data['inopdrachtvoor_zonnepanelen'],data['ordernr_onderaannemer_zonnenpanelen'],project)
+                    return res
+                else:
+                    return None
+            else:
+                return None
     def post(self,request,format=None):
         data = self.request.data
-        #Get medewerkerId from the projecttable
-        medewerkerId = self.getMedewerkerId(data['id'])
-        try:
-            Klant.objects.filter(id=medewerkerId).update(klantnaam=data['klantnaam'])
-            Project.objects.filter(id=data['id']).update(
-                renovatie_nieuwbouw=data['renovatie_nieuwbouw'],projectStatus=data['projectstatus'],
-                projectnaam=data['projectnaam'],plaats=data['plaats'],
-                provincie=data['provincie'],land=data['land'],
-                datumSystemInvoer=data['datum_systeem_invoer'],startDatum=data['startdatum'],
-                offertedatum=data['offertedatum'],
-                )
-            return Response({'success': data['projectnaam'] + 'is successful bijgewerkt'})
-        except Exception as e:
-            return Response({'error': str(e)})
+        projectdata = data['project_data']
+        if data:
+            try:
+                Project.objects.filter(projectnr=projectdata['projectnr']).update(**projectdata)
+                project = Project.objects.get(projectnr=projectdata['projectnr'])
+                try:
+                    self.createOrupdateStatusOnderaanemer(project,data['aanemers_data'])
+                    return Response({ 'success': 'project met success bijewerkt'})
+                except Exception as e:
+                    return Response({ 'error': str(e)})
+            except Exception as e:
+                print(e)
+                return Response({'error': str(e)})
 
 
 # GET ALL PROJECTS
@@ -105,13 +134,9 @@ class AllProjectsList(APIView):
     def get(self,request,format=None):
         try:
 
-            projects = Project.objects.filter('projectnr').get()
-            print(projects)
-          
-            projects_serialiser = serializers.serialize('json', projects)
-            # projects_serialiser = json.dumps(projects), content_type='application/json'
+            projects = Project.objects.values('id','projectnaam','projectnr')
             return Response({
-            'data': projects_serialiser,
+            'data': projects,
         })
         except Exception as e:
 
@@ -124,21 +149,26 @@ class AllProjectsList(APIView):
 class GetAllProjects(APIView):
     klantnameObject = getKlantNaam
     landObject = getLandNaam
-    dateformat = getDateformat
+    # dateformat = getDateformat
 
     def getIcemType(self,projectID):
         icemTypes = []
         
         for site in Site.objects.filter(projectId_id=projectID):
             icemType = Icem.objects.filter(site=site).get() 
-            icemTypes.append(icemType.icemType)
+            if icemType == None:
+                pass
+            else:
+                icemTypes.append(icemType.icemType)
         return icemTypes
     def checkIfIcemTypeexist(self,icemData,typeIcem):
         icemTypeArray = []
-        if typeIcem in icemData:
-            icemTypeArray.append(typeIcem)
-        else:
-            pass
+        
+        for i in icemData:
+            if i == typeIcem:
+                icemTypeArray.append(i)
+            else:
+                pass
         return len(icemTypeArray)
 
     def get(self,request,format=None):
@@ -179,12 +209,11 @@ class GetAllProjects(APIView):
                 'provincie':project.provincie,
                 'land': self.landObject(project.land),
                 'projectsom': '#',
-                'datum_systeem_invoer': getDateformat(project.datumSystemInvoer),
-                'startdatum': getDateformat(project.startDatum),
-                'offertedatum': getDateformat(project.offertedatum)
+                'datum_systeem_invoer': project.datumSystemInvoer,
+                'startdatum': project.startDatum,
+                'offertedatum': project.offertedatum
             }
             projectContext.append(object)
-        
         return Response({
             'data': projectContext
             })
@@ -231,17 +260,18 @@ class ListOnderaanemer(APIView):
 class CreateKlantMedewerkerView(APIView):
     def post(self, request, format=None):
         data = self.request.data
+        klantId = data['klantID_id']
         jsonData = {
             'name_medewerker': data['name_medewerker'],
             'achternaam_medewerker': data['achternaam_medewerker'],
             'phone': data['phone'],
             'functie_medewerker': data['functie_medewerker'],
-            'klantID_id': data['klantID_id']
+            'klantID_id': klantId
         }
    
         try:
-            if KlantMedewerker.objects.filter(klantID_id=data['klantID_id'],functie_medewerker=data['functie_medewerker']).exists():
-                KlantMedewerker.objects.filter(klantID_id=data['klantID_id'],functie_medewerker=data['functie_medewerker']).update(**jsonData)
+            if KlantMedewerker.objects.filter(klantID_id=klantId,functie_medewerker=data['functie_medewerker']).exists():
+                KlantMedewerker.objects.filter(klantID_id=klantId,functie_medewerker=data['functie_medewerker']).update(**jsonData)
                 return Response({'success': data['name_medewerker'] + 'is successful bijgewerkt'})
             else:
                 klantMedeweker = KlantMedewerker.objects.create(**jsonData)
@@ -250,6 +280,161 @@ class CreateKlantMedewerkerView(APIView):
         except Exception as e:
             return Response({'error': str(e)})
 
+class GetProjectDataVoorBewerken(APIView):
+    def getProjectdatas(self,id):
+        try:
+
+            project_data = Project.objects.filter(id=id).values('id','projectnr','projectnaam','plaats','provincie','land','projectStatus','offertenr','exactnr','debiteurnr','renovatie_nieuwbouw','inopdrachtvoor_vloerverwarming','inopdrachtvoor_ventilatieinstallatie','inopdrachtvoor_zonnepanelen','datumSystemInvoer','startDatum','klant_id','offertedatum','uitlijkDatumOpdrachtIndienWTW','uitlijkDatumOpdrachtAlleenICEM','opmerking')
+            return project_data[0]
+        except Exception as e:
+            return str(e)
+    def getKlantId(self,id):
+        try:
+            idKlant = Project.objects.filter(id=id).values('klant_id')
+            return idKlant[0]['klant_id']
+        except Exception as e:
+            return str(e)
+    def getKlantNaam(self,id):
+        try:
+            klant = Klant.objects.filter(id=id).values('id','klantnaam')
+            return klant[0]
+        except Exception as e:
+            return str(e)
+    def getContactpersonFZ(self,id):
+        try:
+            contactpersonen  = Project.objects.filter(id=id).values('selectedWerkvoorbereiderFz','selectedProjecleiderFz')
+           
+            return contactpersonen[0]
+        except Exception as e:
+            return str(e)
+
+    def getMedewerkerFz(self,id):
+        try:
+            if id != None:
+                medewerker = MedewerkerProfile.objects.filter(id=int(id)).values('id','voornaam','achternaam','phone_no')
+                return medewerker[0]
+            else:
+                return None
+        except Exception as e:
+            return str(e)
+    def getInopdrachtVoor(self,id):
+        try:
+            inOpdrachten = Project.objects.filter(id=id).values('inopdrachtvoor_vloerverwarming','inopdrachtvoor_ventilatieinstallatie','inopdrachtvoor_zonnepanelen')
+            return inOpdrachten[0]
+        except Exception as e:
+            return str(e)
+
+    def check_if_is_inopdracht_voor_fz(self,id,string,status):
+        if string == 'FZ':
+            ondernemerProjectStatus = StatusOnderaanemer.objects.filter(project_id_id=id,status = status).values('odernummer','onderaanemer_id')
+            aanemer = Onderaanemerbedrijf.objects.filter(id=ondernemerProjectStatus[0]['onderaanemer_id']).values('id')
+            return {'aanemer': aanemer[0],'odernr':ondernemerProjectStatus[0]['odernummer']}
+        elif string == "Derden":
+            return {'inopdrachtvoor': 'Derden','aanemer': None}
+        else:
+            return {'inopdrachtvoor': None,'aanemer': None}
+
+    def get_contactpersonklant(self,idklant,functie):
+        try:
+            if KlantMedewerker.objects.filter(klantID_id=idklant,functie_medewerker=functie).exists():
+              klantmedewerker = KlantMedewerker.objects.filter(klantID_id=idklant,functie_medewerker=functie).values('name_medewerker','achternaam_medewerker','phone')
+              return klantmedewerker[0]
+            else:
+                return None
+        except Exception as e:
+            return str(e)
+    def get_medewerkers_by_functie(self,string):
+        medewerkers = []
+        try:
+            if Functie.objects.filter(functie=string).exists():
+                functie = Functie.objects.get(functie=string) 
+            else:
+              functie = None 
+        except Exception as e:
+            print(e)
+            return str(e)
+        try:
+            if functie == None:
+                return None
+            else:
+
+                user = CustomUser.objects.filter(functie=functie)
+            
+                if len(user) > 0:
+                    
+                    for i in user:
+                        medewerker = MedewerkerProfile.objects.filter(user=i).values('id','voornaam','achternaam','phone_no')
+                        medewerkers.append(medewerker[0])
+              
+            return medewerkers
+        except Exception as e:
+            print(e)
+            return str(e)
+
+    def post(self,request,format=None):
+        id = self.request.data
+        projectdata = self.getProjectdatas(id)
+        klant = self.getKlantNaam(self.getKlantId(id))
+        
+        contactpersonenFz = self.getContactpersonFZ(id)
+  
+        projectleiderFz = self.getMedewerkerFz(contactpersonenFz['selectedProjecleiderFz'])
+        werkvoorbereiderFz = self.getMedewerkerFz(contactpersonenFz['selectedWerkvoorbereiderFz'])
+        inOpdrachten = self.getInopdrachtVoor(id)
+        inOpdrachtendata = {
+            'afgiftesystem': self.check_if_is_inopdracht_voor_fz(id,inOpdrachten['inopdrachtvoor_vloerverwarming'],'vloerverwarming'),
+            'ventillatie': self.check_if_is_inopdracht_voor_fz(id,inOpdrachten['inopdrachtvoor_ventilatieinstallatie'],'ventilatieinstallatie'),
+            'zonnepanelen': self.check_if_is_inopdracht_voor_fz(id,inOpdrachten['inopdrachtvoor_zonnepanelen'],'zonnepanelen'),
+        }
+        # countries cities
+        provincies = {
+            'nl':returnProvinciesperLand('Nederland'),
+            'en': returnProvinciesperLand('Uk')
+        }
+        jsoncontactpersonenklanten = {
+            'projectleiderklantmedeweker':  self.get_contactpersonklant(klant['id'],'Projectleider'),
+            'werkvoorbereiderklantmedeweker':  self.get_contactpersonklant(klant['id'],'Werk-voorbereider'),
+            'uitvoerderklantmedeweker':  self.get_contactpersonklant(klant['id'],'Uitvoerder'),
+        }
+        jsoncontactpersonenfz = {
+            'projectleiderFz': projectleiderFz,
+            'werkvoorbereiderFz': werkvoorbereiderFz,
+        }
+        jsonmedewerkerFz = {
+            'projectleiders': self.get_medewerkers_by_functie('Projectleider'),
+            'werkvoorbereiders': self.get_medewerkers_by_functie('Werkvoor-bereider')
+        }
+        jsondata = {
+            'projectdata': projectdata,
+            'klant': klant,
+            'contactpersonKlant': jsoncontactpersonenklanten,
+            'contactpersonFz': jsoncontactpersonenfz,
+            'medewerkersfz': jsonmedewerkerFz,
+            'inOpdrachten': inOpdrachtendata,
+            'provincies': provincies
+        }
+        return Response(
+            {
+            'data': jsondata
+            }
+        
+        ) 
+
+class BewerkenKlantMedeweker(APIView):
+    def post(self,request,format=None):
+        data = self.request.data
+        flushData = {
+            'name_medewerker': data['name_medewerker'],
+            'achternaam_medewerker': data['achternaam_medewerker'],
+            'phone': data['phone'],
+
+        }
+        try:
+            KlantMedewerker.objects.filter(klantID_id = data['klantID_id'],functie_medewerker=data['functie_medewerker']).update(**flushData)
+            return Response({'success': True})
+        except Exception as e:
+            return Response({ 'error': str(e)})
+    
 class GetProjectById(APIView):
 
     project_class = ProjectSerializer
@@ -263,8 +448,6 @@ class GetProjectById(APIView):
             else:
                 project = None
 
-   
-    
     # GET WERKVOORBEREIDER Aanemer
     def getWerkVoorbereiderAanemer(self,id):
        
@@ -314,9 +497,10 @@ class GetProjectById(APIView):
             }
             return werkvoorbereiderFZserializer 
         else:
-            return None
+            return {}
     
      # GET PROJECTLEIDER FZ
+
     def getProjectleiderFZ(self,id):
         if id !=0 and id is not None:
             projectleiderFZ = MedewerkerProfile.objects.filter(id=id).get()
@@ -326,9 +510,8 @@ class GetProjectById(APIView):
             }
             return projectleiderFZserializer
         else:
-            return None
+            return {}
 
-    
     def return_installatieComponenten(self,args):
         value = ''
         if args is not None:
@@ -336,11 +519,12 @@ class GetProjectById(APIView):
         else:
             value = None
         return value
+
     def return_bedrijfsaanemers(self):
         res = Onderaanemerbedrijf.objects.values('id','naam')
         return res
 
-    def getProjectleiderAanemerByKlantId(self,id,string):
+    def get_klant_medewerker(self,id,string):
         if KlantMedewerker.objects.filter(klantID_id=id,functie_medewerker=string).exists():
             res = KlantMedewerker.objects.filter(klantID_id=id,functie_medewerker=string).get()
             jsonresponse = {'id': res.id,'naam':res.name_medewerker + ' ' + res.achternaam_medewerker,'phone': res.phone}
@@ -348,10 +532,16 @@ class GetProjectById(APIView):
         else:
             return None
 
+    def checkifIsnotNone(self,value):
+        if value == None:
+            return None
+        else: 
+            return value
+    
     def post(self,request, *args,**kwargs):
 
         data = self.request.data
-        project = self.get_queryset(int(data))
+        project = self.get_queryset(data)
         projectnummer = ''   
         klantnaam = ''
         projectnaam = ''
@@ -365,17 +555,11 @@ class GetProjectById(APIView):
         projectleiderFZ = ''
         contextprojectbewerken = []
         
-        # countries cities
-        nederland = 'Nederland'
-        country_nederland= CountryInfo(nederland)
-        provincies_Nederland = country_nederland.provinces()
-        england = 'Uk'
-        country_england = CountryInfo(england)
-        provincies_England = country_england.provinces()
         provincies = {
-            'nl':provincies_Nederland,
-            'en': provincies_England
+            'nl': returnProvinciesperLand('Nederland'),
+            'en': returnProvinciesperLand('Uk')
         }
+
         if project != None:
             projectnummer = project.projectnr
             klantnaam = self.klantnameObject(project.klant_id)
@@ -383,14 +567,11 @@ class GetProjectById(APIView):
             plaats = project.plaats
             provincie = project.provincie
             projectstatus = project.projectStatus
-            werkVoorbereiderAanemer = self.getWerkVoorbereiderAanemer(project.selectedWerkvoorbereiderAanmelder)
-            projectleiderAanemer = self.getProjectleiderAanemer(project.selectedProjectleiderAanmelder)
-            uitvoerderAanemer = self.getUitvoerderAanemer(project.selectedUitvoerderAanmelder)
             werkVoorbereiderFZ = self.getWerkvoorbereiderFZ(project.selectedWerkvoorbereiderFz)
             projectleiderFZ = self.getProjectleiderFZ(project.selectedProjecleiderFz)
-            projecleiderAanemer_ = self.getProjectleiderAanemerByKlantId(project.klant_id,'Projectleider')
-            werknemerAanemer_ = self.getProjectleiderAanemerByKlantId(project.klant_id,'Werk-voorbereider')
-            uitvoerderAanemer_ = self.getProjectleiderAanemerByKlantId(project.klant_id,'Uitvoerder')
+            projecleiderAanemer_ = self.get_klant_medewerker(project.klant_id,'Projectleider')
+            werknemerAanemer_ = self.get_klant_medewerker(project.klant_id,'Werk-voorbereider')
+            uitvoerderAanemer_ = self.get_klant_medewerker(project.klant_id,'Uitvoerder')
          
             contextprojectbewerken = {
                 'projectnummer': projectnummer,
@@ -409,12 +590,12 @@ class GetProjectById(APIView):
                 'projectleiderAanemer': projecleiderAanemer_,
                 'werkVoorbereiderAanemer': werknemerAanemer_,
                 'uitvoerderAanemer': uitvoerderAanemer_,
-                'projectleiderFZname': projectleiderFZ['name'],
-                'projectleiderFzphone':projectleiderFZ['phone'],
+                'projectleiderFZname': projectleiderFZ.get('name', ""),
+                'projectleiderFzphone':projectleiderFZ.get('phone', ""),
                 'projectleiderFzArray': projectleiderFZArray('Projectleider'), 
                 # 'werkVoorbereiderFZ': werkVoorbereiderFZ,
-                'werkvoorbereiderFZname': werkVoorbereiderFZ['name'],
-                'werkvoorbedreiderFZphone':werkVoorbereiderFZ['phone'],
+                'werkvoorbereiderFZname': werkVoorbereiderFZ.get('name', ""),
+                'werkvoorbedreiderFZphone':werkVoorbereiderFZ.get('phone', ""),
                 'werkVoorbereiderFzArray': projectleiderFZArray('Werkvoor-bereider'),
                 'inopdrachtAfgifteSystem': project.inopdrachtvoor_vloerverwarming,
                 'afgifte_systeem': self.return_installatieComponenten(project.inopdrachtvoor_vloerverwarming),
@@ -462,11 +643,19 @@ class CreateProjectView(APIView):
                 arraobject.append({'status':i['status'],'onderaanemer_id':i['onderaanemer_id'],'odernummer':i['odernummer'],'project_id_id':i['project_id_id']})
 
         return arraobject
-    
+    def return_date_string_format(self,stringDate):
+        # dateformat = None
+        if stringDate != None and stringDate !='NaN-NaN-NaN' and stringDate != "01-01-1970":
+            dateformat = datetime.strptime(stringDate, '%d-%m-%y')
+            return dateformat
+        else:
+            dateformat = "01-01-1970"
+            return dateformat
+
+       
     def post(self, request, format=None):
         if(self.request.data):
             data = self.request.data
-           
             # PROJECT OBJECT
             projectObject = {
                 'projectnr':data['projectnr'],
@@ -479,9 +668,6 @@ class CreateProjectView(APIView):
                 'exactnr':data['exactnr'],
                 'debiteurnr':data['debiteurnr'],
                 'renovatie_nieuwbouw':data['renovatie_nieuwbouw_'],
-                'selectedProjectleiderAanmelder': data['selectedProjecleider'],
-                'selectedWerkvoorbereiderAanmelder': data['selectedwerkvoorbereider'],
-                'selectedUitvoerderAanmelder': data['selectedUivoerder'],
                 'selectedWerkvoorbereiderFz': data['selectedWerkvoorbereiderFz'],
                 'selectedProjecleiderFz': data['selectedProjecleiderFz'],
                 'inopdrachtvoor_vloerverwarming': data['inopdrachtvoor_vloerverwarming'],
@@ -496,14 +682,14 @@ class CreateProjectView(APIView):
                 'opmerking': data['opmerking']
             }
   
-            # print(statusonderaanmerObject)
+
             try:
                 if data['projectnr'] != None:
                     # create project
                     project =  Project.objects.create(**projectObject)
                     project.save()
                     id = project.id
-                    
+                    print(id)
                     try:
                         # Create the relatie tussen ondernemers en project
                         # CHECKIFONDERAANEMER IS None if not return array of objects
@@ -516,7 +702,7 @@ class CreateProjectView(APIView):
                        
                         
                         statusonderaanmerObject = self.return_array_of_objects_status_onderaanemer(objectofelementOnderaanemer)
-                        print(statusonderaanmerObject)
+                     
                         if len(statusonderaanmerObject) != 0:
                             for i in statusonderaanmerObject:
                                 statusonderaanemer = StatusOnderaanemer.objects.create(**i)

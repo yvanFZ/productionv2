@@ -1,14 +1,14 @@
 from django.views import View
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .serializers import MedewerkerSerializer, RoleSerializer, UsersSerializer, FunctieSerializer
+from .serializers import MedewerkerSerializer, UsersSerializer
 from .models import Role,CustomUser, Functie, MedewerkerProfile
 from django.contrib.auth.hashers import make_password
-from django.db.models import Count
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
-from django.utils.decorators import method_decorator
 from rest_framework import permissions
+from django.contrib.auth.models import Permission
+from django.db import transaction
+from permissions.medewerkerpermissions import permission_required
+
 # Create your views here.
 
 # KLANTEN AANMAKEN
@@ -16,7 +16,18 @@ class PostKlantenView(APIView):
     def post(self, request, format=None):
         if(self.request.data):
             data = self.request.data
-           
+
+class LoadProjectleiders(APIView):
+    permission_1 = "view_customuser"
+    permission_2 = "add_permission"
+    permission_classes = [permission_required(permission_1) | permission_required(permission_2)]
+    #get all users met functie projectleider
+    def get_all_users_met_functie_projectleider():
+        data = CustomUser.objects.filter(functie_id__in = [2]).exists()
+        return data
+    def get(self,request,format):
+        data = MedewerkerProfile.objects.filter(player__name__in = []).exists()
+        return Response({'data': data})
 # MEDEWERKER UPDATED
 class UpdateMedewerkersView(APIView):
     def post(self, request, format=None):
@@ -40,7 +51,6 @@ class UpdateMedewerkersView(APIView):
                           
                 if CustomUser.objects.filter(email=userObject['email']).update(**userObject):
                     user = CustomUser.objects.filter(email=userObject['email']).values('id')[0]
-                    print(user['id'])
                     medewerker = MedewerkerProfile.objects.filter(user_id=user['id']).update(**medewerkerObject)
                     if medewerker:
                         return Response({'success': 'medewerker is met success bijgewerkt'})
@@ -52,23 +62,33 @@ class UpdateMedewerkersView(APIView):
             except Exception as e:
                 print(e)
                 return Response({'error': str(e)})
-            
-            
-          
-
+                   
 # MEDEWERKERS AANMAKEN
-@method_decorator(csrf_protect, name='dispatch')
 class PostMedewerkersView(APIView):
-    permission_classes = (permissions.AllowAny,)
+    permission_classes = [permission_required("add_customuser") | permission_required("add_permission")]
+ 
+    def add_permissions_to_user(self,permissions,user_id):
+        user = CustomUser.objects.get(id=user_id)
+        try:
+
+            with transaction.atomic():
+                for i in permissions:
+                    permission = Permission.objects.get(codename=i)
+                    user.user_permissions.add(permission)
+                    user.save()
+                   
+            return True
+        except Exception as e:
+            return str(e)
+        
     def createMedewerkerFuncion(self,data):
         medewerker = MedewerkerProfile.objects.create(**data)
         medewerker.save()
         return medewerker
+    
     def post(self, request, format=None):
         if(self.request.data):
-            
             data = self.request.data
-            # print(type(data))
             re_password = data['re_password']
             userObject ={
                 'email':data['email'],
@@ -88,7 +108,7 @@ class PostMedewerkersView(APIView):
                        else:
                             userObject['password'] = make_password(userObject['password'])
                             try:
-                                print(userObject)
+                            
                                 user = CustomUser.objects.create(**userObject)
                                 
                             except Exception as e:
@@ -105,22 +125,27 @@ class PostMedewerkersView(APIView):
                                 'phone_no': data['phone_no'],
                                 'user_id': user.id
                             }
+                            self.add_permissions_to_user(data['permissions'],user.id,)
+                            # Check wich pages and permissions the user has
+                            # update table users_permissions in database
                             try:
-                           
                                 self.createMedewerkerFuncion(objectMedewerker)
+                                # 
                                 return Response({'success': True})
                             except Exception as e: 
-                                # print(e)
+                            
                                 return Response({'error':str(e)})
                     else:   
                         return Response({'error': 'Password doesnt match'})
             except Exception as e:
-                # print(e)
+               
                 return Response({'error':str(e)})
        
 # GET ALL MEDEWERKER API
 class GetAllMedewerkersView(APIView):
-
+    permission_classes = [permission_required("view_customuser") | permission_required("add_permission")]
+    def get_queryset(self):
+        return  MedewerkerProfile.objects.values('id','voornaam','achternaam','geslacht','tussenvoegsel','user_id','phone_no')
     def getFunctieMedewerker(self,id):
         user = CustomUser.objects.filter(id=id).values('functie_id')
         user_id = user[0]['functie_id']
@@ -132,15 +157,14 @@ class GetAllMedewerkersView(APIView):
     def getuser_data(self,id):
         user = CustomUser.objects.filter(id=id).values('email','is_active')
         return user[0]
+
     def get(self, request, format=None):
-        # medewerkers = MedewerkerProfile.objects.all()
+     
         medewerkersArray = []
-        
-        medewerkers = MedewerkerProfile.objects.values('id','voornaam','achternaam','geslacht','tussenvoegsel','user_id','phone_no')
+        medewerkers = self.get_queryset()
         for i in medewerkers:
             functieDatas =  self.getFunctieMedewerker(i['user_id'])
             userDatas = self.getuser_data(i['user_id'])
-            # print(functieDatas)
             medewerkerobject = {
             'geslacht': i['geslacht'],
             'voornaam':i['voornaam'],
@@ -274,10 +298,9 @@ class CreateFunctieView(APIView):
                 if Functie.objects.filter(functie = data['functie']).exists():
                     return Response({'error':'the functie name exist already'})
                 else:
-                    print(data['functie'])
                     try:
                         Functie.objects.create(**data)
-                        print('succed')
+                        
                     except Exception as e:
                         print(str(e))
 
@@ -298,8 +321,16 @@ class GetAllUsersView(APIView):
         users = UsersSerializer(users, many=True)
         return Response(users.data)
 
-#Get userProfle
+# Get userProfle
 
+
+class GetALLMedewerkersPermissions(APIView):
+    permission_classes = [permission_required("add_permission")]
+    def get(self,request,format=None):
+        # get all apps from content_type table
+        apps = Permission.objects.values('name','codename')
+       
+        return Response({'data': apps})
 class GetUserProfileView(APIView):
     def getFunctieName(self,args):
         functie = Functie.objects.filter(id=args).get()

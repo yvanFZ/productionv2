@@ -1,5 +1,5 @@
 from django.urls import path, re_path
-from .views import GetFunctieView,RoleListView,PostMedewerkersView,GetAllMedewerkersView,PasswordAanpassen,RoleView,CreateFunctieView , GetAllUsersView, GetUserProfileView, UpdateUserProfileView,UpdateMedewerkersView
+from .views import GetALLMedewerkersPermissions,GetFunctieView,RoleListView,PostMedewerkersView,GetAllMedewerkersView,PasswordAanpassen,RoleView,CreateFunctieView , GetAllUsersView, GetUserProfileView, UpdateUserProfileView,UpdateMedewerkersView
 from . import testview 
 
 urlpatterns = [
@@ -16,7 +16,7 @@ urlpatterns = [
     path('get-allmedewerkers',GetAllMedewerkersView.as_view()), # this route will change in the future
     path('all-medewerkerAanmaken',PostMedewerkersView.as_view()), # this route will change in the future
     path('medewerkers_update',UpdateMedewerkersView.as_view()), 
-
+    path('get-all_medewerkers_permissions',GetALLMedewerkersPermissions.as_view()),
     # test urls 
     re_path('<int:id>',testview.index, name='index'),
     path('',testview.login_user,name="login"),

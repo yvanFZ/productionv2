@@ -7,22 +7,32 @@ from rest_framework.response import Response
 from project.models import Project
 from mpo.models import ProductiebonStatus
 from datetime import date
-
+import datetime
+from format.dateformat import  dateformat
+from django.db import transaction
+from django.db.models import Case, When
+def getProject(id):
+    try:
+        project = Project.objects.get(id=id)
+        return project
+    except Exception as e:
+        return str(e)
 
 
 class GetProductiestatusIcemOverzicht(APIView):
     # icem gegevens + berekeningen
 
-    def getIcemType(self,id):
-        icemType = Icem.objects.filter(id=id).get()
-        return icemType.icemType
+    def getIcemType(self,site):
+        icem = Icem.objects.filter(site=site).get()
+        return icem
     
     def checkifsitehasmissingondedelen(self,siteID, projectID):
         
         # check if opleverrapport exist
-        if Opleverrapport.objects.filter(site_id=siteID,project_id=projectID).exists():
+        if Opleverrapport.objects.filter(site=siteID,project=projectID).exists():
             
-            opleverrapport = Opleverrapport.objects.filter(site_id=siteID,project_id=projectID).get()
+            opleverrapport = Opleverrapport.objects.filter(site=siteID,project=projectID).get()
+           
             object = {
                 'router': opleverrapport.router,
                 'poe24v' : opleverrapport.poe24v,
@@ -84,8 +94,8 @@ class GetProductiestatusIcemOverzicht(APIView):
         else:
             return False
     def checkiftransportgereedBijdezeSite(self,siteID, projectID):
-        if Testrapport.objects.filter(site_id=siteID,project_id=projectID).exists():
-             testrapport = Testrapport.objects.filter(site_id=siteID,project_id=projectID).get()
+        if Testrapport.objects.filter(site=siteID,project_id=projectID).exists():
+             testrapport = Testrapport.objects.filter(site=siteID,project=projectID).get()
              is_transportgereed = testrapport.transport_gereed
              if is_transportgereed == 1:
                  return True
@@ -94,8 +104,8 @@ class GetProductiestatusIcemOverzicht(APIView):
         else:
             return False
     def checkiftestrapportdefinietBijdezeSite(self,siteID, projectID):
-        if Testrapport.objects.filter(site_id=siteID,project_id=projectID).exists():
-             testrapport = Testrapport.objects.filter(site_id=siteID,project_id=projectID).get()
+        if Testrapport.objects.filter(site=siteID,project=projectID).exists():
+             testrapport = Testrapport.objects.filter(site=siteID,project=projectID).get()
              is_transportgereed = testrapport.testrapport_definitief
              if is_transportgereed == 1:
                  return True
@@ -119,23 +129,26 @@ class GetProductiestatusIcemOverzicht(APIView):
                 return None
         except Exception as e:
             return Response({'error':str(e)})
-    def leverDatumModule(self,icemId):
-        icem = Icem.objects.filter(id=icemId).get()
-        planningId = icem.planningId_id
-        planning = Planning.objects.filter(id=planningId).get()
+    def leverDatumModule(self,site):
+        icem = Icem.objects.filter(site=site).get()
+        # planningId = icem.planningId_id
+        
+        planning = Planning.objects.filter(icem=icem).get()
+       
         return planning.leverdatum
         
     def getGridData(self,siteID, projectID):
         # get site gegevens
         arrayMissendeObjects =  self.getObjectMissendeOndelen(siteID,projectID)
-
-        site = Site.objects.filter(id=siteID,projectId_id=projectID).get()
-        projectId = Project.objects.filter(id=projectID).get()
+      
+        site = Site.objects.filter(id=siteID.id,projectId_id=projectID).get()
+       
+        projectId = Project.objects.filter(id=projectID.id).get()
         # check if its exist
         transportgereed = None
         testrapport_definitief = None
-        if Testrapport.objects.filter(site_id=siteID,project_id=projectID).exists():
-            testrapport = Testrapport.objects.filter(site_id=siteID,project_id=projectID).get()
+        if Testrapport.objects.filter(site=siteID,project=projectID).exists():
+            testrapport = Testrapport.objects.filter(site=siteID,project=projectID).get()
             transportgereed = testrapport.transport_gereed
             testrapport_definitief = testrapport.testrapport_definitief
         else:
@@ -143,8 +156,9 @@ class GetProductiestatusIcemOverzicht(APIView):
             transportgereed = None
             testrapport_definitief = None
         productiegereed = None
-        if ProductiebonStatus.objects.filter(site_id=siteID,projectId_id = projectID).exists():
-            productiebonstatus = ProductiebonStatus.objects.filter(site_id=siteID,projectId_id = projectID).get()
+        icem = Icem.objects.get(site=siteID)
+        if ProductiebonStatus.objects.filter(icem=icem).exists():
+            productiebonstatus = ProductiebonStatus.objects.filter(icem=icem).get()
             productiegereed = productiebonstatus.productiegereed
             productiegereed_datum = productiebonstatus.productieDatum
         else:
@@ -161,7 +175,7 @@ class GetProductiestatusIcemOverzicht(APIView):
             'missende_onderdelen': arrayMissendeObjects,
             'transportgereed': transportgereed,
             'testrapport_definitief': testrapport_definitief,
-            'leverdatum': self.leverDatumModule(site.icemId_id),
+            'leverdatum': self.leverDatumModule(site),
             'productiegereed': productiegereed,
             'productiegereed_datum': productiegereed_datum
         }
@@ -169,6 +183,7 @@ class GetProductiestatusIcemOverzicht(APIView):
 
     def post(self,request,format=None):
         data = self.request.data
+
         icemType = []
         is_missendeOnderdelenBijdezeSite = []
         transportgereed = []
@@ -176,15 +191,15 @@ class GetProductiestatusIcemOverzicht(APIView):
         leverdatumModule = []
         datagridData = []
         try:
-
-            for site in Site.objects.filter(projectId_id=(data)):
+            project = getProject(data)
+            for site in Site.objects.filter(projectId_id=project).order_by('id'):
                 # get the icem type
-                icemType_ = self.getIcemType(site.icemId_id) 
-                is_missendeOnderdelenBijdezeSite_ = self.checkifInSiteBoolean(self.checkifsitehasmissingondedelen(site.id,data))
-                is_getransportgereed = self.checkiftransportgereedBijdezeSite(site.id,data)
-                testrapportdefinitief_ = self.checkiftestrapportdefinietBijdezeSite(site.id,data)
-                leverdatumModule_ = self.leverDatumModule(site.icemId_id)
-                datagridData_ = self.getGridData(site.id,data)
+                icemType_ = self.getIcemType(site).icemType
+                is_missendeOnderdelenBijdezeSite_ = self.checkifInSiteBoolean(self.checkifsitehasmissingondedelen(site,project))
+                is_getransportgereed = self.checkiftransportgereedBijdezeSite(site,project)
+                testrapportdefinitief_ = self.checkiftestrapportdefinietBijdezeSite(site,project)
+                leverdatumModule_ = self.leverDatumModule(site)
+                datagridData_ = self.getGridData(site,project)
 
                 icemType.append(icemType_)
                 is_missendeOnderdelenBijdezeSite.append(is_missendeOnderdelenBijdezeSite_)
@@ -213,36 +228,50 @@ class AanmakenProductieStatusIcem(APIView):
         return d
 
     def aanmakenProductieStatusIcem(self,args):
-        site = Site.objects.filter(bouwnr=args['site_id'],projectId_id = args['projectId_id']).get()
-        print(site)
-        # if Project.objects.filter()
-        if ProductiebonStatus.objects.filter(projectId_id = args['projectId_id'],site_id = site.id).exists():
-            # Update the row
-            try:
-                productie_datum = self.getDatetoday()
-                ProductiebonStatus.objects.filter(projectId_id = args['projectId_id'],site_id = site.id).update(
-                    productiegereed=args['productiegereed'],productieDatum=productie_datum
-                )
-                return 'success bijgewerkt'
-            except Exception as e:
-                return  str(e)
-        else:
-            try:
-                args['productieDatum'] = self.getDatetoday()
-                print(args)
-                ProductiebonStatus.objects.create(**args)
-                return 'success aangemaakt'
-            except Exception as e:
-                return str(e)
+        projectId = getProject(args['project'])
+        data = args['state']
+        sites = Site.objects.filter(projectId_id=projectId).order_by('id')
+        siteIds = sites.values_list('id',flat=True)
+        icems = Icem.objects.in_bulk(list(siteIds))
+        # preserved = Case(*[When(pk=pk, then=pos) for pos, pk in enumerate(icems)])
+        # icemIds = Icem.objects.filter(pk__in=icems).order_by(preserved)
+        # print(icems)
+
+        with transaction.atomic():
+            for index,icem in enumerate(icems):
+                jsondata = {
+                    'productiegereed':data[index]['productiegereed'],
+                    'productieDatum': dateformat(data[index]['productieDatum'])
+                }
+                # print(jsondata)
+                # if Project.objects.filter()
+                if ProductiebonStatus.objects.filter(icem = icem).exists():
+                    # Update the row
+                    
+                    try:
+                        # productie_datum = self.getDatetoday()
+                        ProductiebonStatus.objects.filter(icem = icem).update(**jsondata)
+                    except Exception as e:
+                        return  str(e)
+                else:
+                    try:
+                        # args['productieDatum'] = self.getDatetoday()
+                        # print(args)
+                        try:
+                            ProductiebonStatus.objects.create(**jsondata)
+                        except Exception as e:
+                            print(str(e))
+                        return 'success aangemaakt'
+                    except Exception as e:
+                        return str(e)
+            
 
 
     def post(self,request,format=None):
         data = self.request.data
-        print(data)
         try:
-            message = self.aanmakenProductieStatusIcem(data)
-            print(message)
-            return Response({'success': message})
+            self.aanmakenProductieStatusIcem(data)
+            return Response({'success': True})
         except Exception as e:
             return Response({'error': str(e)})
              
