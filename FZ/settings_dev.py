@@ -28,12 +28,12 @@ environ.Env.read_env()
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # Your secret key
-# def get_env_variable(var_name):
-#     try:
-#         return os.environ[var_name]
-#     except KeyError:
-#         error_msg = "set the %s environment variable" % var_name
-#         raise ImproperlyConfigured(error_msg)
+def get_env_variable(var_name):
+    try:
+        return os.environ[var_name]
+    except KeyError:
+        error_msg = "set the %s environment variable" % var_name
+        raise ImproperlyConfigured(error_msg)
 
 
 SECRET_KEY = env('SECRET_KEY')
@@ -42,7 +42,7 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = get_env_variable('DEBUG') # Must be True in debelopement for handeling van de staticfiles
 
-DEBUG = False
+DEBUG = True
 # Application definition
 
 INSTALLED_APPS = [
@@ -70,13 +70,12 @@ INSTALLED_APPS = [
 CSRF_COOKIE_HTTPONLY = False
 # CSRF_COOKIE_SAMESITE = 'Strict'
 CSRF_COOKIE_SAMESITE=None
-# ALLOWED_HOSTS=['127.0.0.1']
-ALLOWED_HOSTS=['app-factoryzero.azurewebsites.net']
+ALLOWED_HOSTS=['127.0.0.1']
 CORS_ORIGIN_ALLOW_ALL = True
-CSRF_TRUSTED_ORIGINS = ['https://app-factoryzero.azurewebsites.net']
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:3000']
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = (
-    'https://app-factoryzero.azurewebsites.net',
+    'http://127.0.0.1:3000',
 )
 REST_FRAMEWORK = {
     # Permissions possible in restframework
@@ -100,7 +99,7 @@ MIDDLEWARE = [
    
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     
@@ -115,7 +114,7 @@ ROOT_URLCONF = 'FZ.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR,'build')], # voor react
+        'DIRS': [os.path.join(BASE_DIR,'build_dev')], # voor react
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -183,14 +182,13 @@ USE_TZ = False
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 # STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 # STATICFILES_DIRS = os.path.join(BASE_DIR, 'build/static/')
 
 # # the path for developement
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'build/static/')] 
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'build_dev/static/')] 
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 # STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # LOGIN_REDIRECT_URL = "authentification:home"
