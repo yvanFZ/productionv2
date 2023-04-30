@@ -36,7 +36,7 @@ def get_env_variable(var_name):
         raise ImproperlyConfigured(error_msg)
 
 
-SECRET_KEY = get_env_variable('SECRET_KEY')
+SECRET_KEY = env('SECRET_KEY')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -134,12 +134,12 @@ WSGI_APPLICATION = 'FZ.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': get_env_variable('DB_NAME'), 
-        'USER': get_env_variable('DB_USER'),
-        'PASSWORD': get_env_variable('DB_PASSWORD'),
-        'HOST': get_env_variable('DB_HOST'), 
-        'PORT': get_env_variable('DB_PORT'),
-        'sslmode': get_env_variable('sslmode'),
+        'NAME': env('DB_NAME'), 
+        'USER': env('DB_USER'),
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('DB_HOST'), 
+        'PORT': env('DB_PORT'),
+        'sslmode': env('sslmode'),
 
      
     }
