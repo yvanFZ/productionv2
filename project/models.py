@@ -19,7 +19,7 @@ class KlantMedewerker(models.Model):
     achternaam_medewerker = models.CharField(max_length=30,null=False,default=False)
     phone = models.CharField(max_length=30,null=False,default=False)
     functie_medewerker = models.CharField(max_length=30,null=False,default=False)
-    klantID = models.ForeignKey(Klant,default=False,null=False, on_delete=models.CASCADE)
+    klant = models.ForeignKey(Klant,default=False,null=False, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"{self.name_medewerker}"
@@ -50,7 +50,9 @@ class Project(models.Model):
 
     def __str__(self):
         return f"{self.projectnaam}"
-
+class ProjectKlantMedewerker(models.Model):
+    project = models.ForeignKey(Project,default=False,null=False, on_delete=models.CASCADE)
+    klantMedewerker = models.ForeignKey(KlantMedewerker,default=False,null=False, on_delete=models.CASCADE)
 class ProjectIcem(models.Model):
     iNumber = models.CharField(max_length=10,default=False,null=False)
     pNumber = models.CharField(max_length=10,default=False,null=False)
@@ -69,9 +71,9 @@ class Onderaanemerbedrijf(models.Model):
 
 class StatusOnderaanemer(models.Model):
     status = models.CharField(max_length=30,null=False,default=False)
-    onderaanemer = models.ForeignKey(Onderaanemerbedrijf,default=False,null=True, on_delete=models.CASCADE)
-    odernummer =  models.CharField(max_length=30,null=False,default=False)
-    project_id = models.ForeignKey(Project,default=False,null=True, on_delete=models.CASCADE) 
+    onderaanemer = models.ForeignKey(Onderaanemerbedrijf,default=False,null=False, on_delete=models.CASCADE)
+    odernummer =  models.CharField(max_length=30,null=True,default=True)
+    project_id = models.ForeignKey(Project,default=False,null=False, on_delete=models.CASCADE) 
     
 class Vertegenwoordiger_Project(models.Model):
     vertegenwoordiger = models.ForeignKey(MedewerkerProfile,null=False, default=False, blank=False,on_delete=models.CASCADE)

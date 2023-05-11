@@ -4,7 +4,7 @@ from .views import GetDataToPrint,Getproductiebon,UpdateMPO,GetMPO,CreateProduct
 app_name = 'mpo'
 
 urlpatterns = [
-    path('update-mpo',UpdateMPO.as_view()),
+    path('update-mpo',UpdateMPO.as_view(),name='update'),
     path('get-mpo',GetMPO.as_view()),
     path('create-productiestatus',CreateProductieStatus.as_view()),
     path('get-productiestatus',GetProductieStatus.as_view()),

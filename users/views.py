@@ -9,6 +9,9 @@ from django.contrib.auth.models import Permission
 from django.db import transaction
 from permissions.medewerkerpermissions import permission_required
 
+
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 # Create your views here.
 
 # KLANTEN AANMAKEN
@@ -64,8 +67,10 @@ class UpdateMedewerkersView(APIView):
                 return Response({'error': str(e)})
                    
 # MEDEWERKERS AANMAKEN
+@method_decorator(csrf_protect, name='dispatch')
 class PostMedewerkersView(APIView):
-    permission_classes = [permission_required("add_customuser") | permission_required("add_permission")]
+    permission_classes = (permissions.AllowAny,)
+    # permission_classes = [permission_required("add_customuser") | permission_required("add_permission")]
  
     def add_permissions_to_user(self,permissions,user_id):
         user = CustomUser.objects.get(id=user_id)
@@ -131,7 +136,7 @@ class PostMedewerkersView(APIView):
                             try:
                                 self.createMedewerkerFuncion(objectMedewerker)
                                 # 
-                                return Response({'success': True})
+                                return Response({'success': 'Medewerker is successfuly toegevogd'})
                             except Exception as e: 
                             
                                 return Response({'error':str(e)})

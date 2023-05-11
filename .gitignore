@@ -9,4 +9,6 @@ db.sqlite3
 .production
 .readMe
 /settings_dev.py
+./settings.deploy
+.build_dev
 # /settings.py
