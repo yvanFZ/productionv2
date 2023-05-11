@@ -8,7 +8,7 @@ db.sqlite3
 # /env
 .production
 .readMe
-/settings_dev.py
-./settings.deploy
-.build_dev
+.FZ/settings_dev.py
+.FZ/settings.deploy
+.FZ/build_dev
 # /settings.py
